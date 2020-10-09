@@ -210,6 +210,199 @@ int traceTp_netifRcvSkb(struct netifRcvSkb_args *args) {
     return 0;
 }
 
+int traceTp_netifRx(struct netifRcvSkb_args *args) {
+    struct event_t event = {};
+    event.func[0] = 'n';
+    event.func[1] = 'e';
+    event.func[2] = 't';
+    event.func[3] = 'i';
+    event.func[4] = 'f';
+    event.func[5] = 'R';
+    event.func[6] = 'x';
+    event.func[7] = 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sk_buff *skb;
+    member_read(&skb, args, skbaddr);
+    event.pid = pid;
+    event.ts = bpf_ktime_get_ns();
+
+    if (1 == do_trace_skb(&event, args, skb)) {
+
+        //shoot to userspace
+        events.perf_submit(args, &event, sizeof(event));
+        //bpf_trace_printk("traceTp_netifRx\\n");
+    }
+
+    return 0;
+}
+
+int traceTp_netDevQ(struct netifRcvSkb_args *args) {
+    struct event_t event = {};
+    event.func[0] = 'n';
+    event.func[1] = 'e';
+    event.func[2] = 't';
+    event.func[3] = 'D';
+    event.func[4] = 'e';
+    event.func[5] = 'v';
+    event.func[6] = 'Q';
+    event.func[7] = 'u';
+    event.func[8] = 'e';
+    event.func[9] = 'u';
+    event.func[10] = 'e';
+    event.func[11] = 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sk_buff *skb;
+    member_read(&skb, args, skbaddr);
+    event.pid = pid;
+    event.ts = bpf_ktime_get_ns();
+
+    if (1 == do_trace_skb(&event, args, skb)) {
+
+        //shoot to userspace
+        events.perf_submit(args, &event, sizeof(event));
+        //bpf_trace_printk("traceTp_netifRcvSkb_2\\n");
+    }
+
+    return 0;
+}
+
+struct netDevXmit_args {
+    // from /sys/kernel/debug/tracing/events/net/net_dev_xmit/format
+    u64 __unused__;
+    u64 skbaddr;
+    u32 len;
+    u32 rc;
+    u32 name;
+};
+int traceTp_netDevX(struct netDevXmit_args *args) {
+    struct event_t event = {};
+    event.func[0] = 'n';
+    event.func[1] = 'e';
+    event.func[2] = 't';
+    event.func[3] = 'D';
+    event.func[4] = 'e';
+    event.func[5] = 'v';
+    event.func[6] = 'X';
+    event.func[7] = 'm';
+    event.func[8] = 'i';
+    event.func[9] = 't';
+    event.func[10] = 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sk_buff *skb;
+    member_read(&skb, args, skbaddr);
+    event.pid = pid;
+    event.ts = bpf_ktime_get_ns();
+
+    if (1 == do_trace_skb(&event, args, skb)) {
+
+        //shoot to userspace
+        events.perf_submit(args, &event, sizeof(event));
+        //bpf_trace_printk("traceTp_netifRcvSkb_2\\n");
+    }
+
+    return 0;
+}
+
+struct netifRxEtry_args {
+    // from /sys/kernel/debug/tracing/events/net/netif_rx_entry/format
+    u64 __unused__;  //common*
+    u64 __unused1__; //name, napi_id
+    u16 __unused2__; //queue_mapping
+    u64 skbaddr;
+    u64 __unused3__; //vlan-tagged ~ ip_summed
+    u32 hash;
+    u8 l4_hash;
+    u64 __unused4__; //len, data_len
+    u32 truesize;
+    u8 mac_header_valid;
+    u32 mac_header;
+    u8 nr_frags;
+    u32 gso;
+};
+int traceTp_netifRxEtry(struct netifRxEtry_args *args) {
+    struct event_t event = {};
+    event.func[0] = 'n';
+    event.func[1] = 'e';
+    event.func[2] = 't';
+    event.func[3] = 'i';
+    event.func[4] = 'f';
+    event.func[5] = 'R';
+    event.func[6] = 'x';
+    event.func[7] = 'E';
+    event.func[8] = 'n';
+    event.func[9] = 't';
+    event.func[10] = 'r';
+    event.func[11] = 'y';
+    event.func[12] = 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sk_buff *skb;
+    member_read(&skb, args, skbaddr);
+    event.pid = pid;
+    event.ts = bpf_ktime_get_ns();
+
+    if (1 == do_trace_skb(&event, args, skb)) {
+
+        //shoot to userspace
+        events.perf_submit(args, &event, sizeof(event));
+        //bpf_trace_printk("traceTp_netifRcvSkb_2\\n");
+    }
+
+    return 0;
+}
+
+struct netDevStrtX_args {
+    // from /sys/kernel/debug/tracing/events/net/net_dev_start_xmit/format
+    u64 __unused__;  //common*
+    u32 name;
+    u16 queue_mapping;
+    u64 skbaddr;
+    u64 __unused1__; //vlan_tagged~ip_summed
+    u64 __unused2__; //len, data_len
+    u32 network_offset;
+    u8 transport_offset_valid;
+    u32 transport_offset;
+    u8 tx_flags;
+    u32 __unused3__; // gso_size, gso_segs
+    u16 gso_type;
+};
+int traceTp_netDevStrtX(struct netDevStrtX_args *args) {
+    struct event_t event = {};
+    event.func[0] = 'n';
+    event.func[1] = 'e';
+    event.func[2] = 't';
+    event.func[3] = 'D';
+    event.func[4] = 'e';
+    event.func[5] = 'v';
+    event.func[6] = 'S';
+    event.func[7] = 't';
+    event.func[8] = 'a';
+    event.func[9] = 'r';
+    event.func[10] = 't';
+    event.func[11] = 'X';
+    event.func[12] = 'm';
+    event.func[13] = 'i';
+    event.func[14] = 't';
+    event.func[11] = 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sk_buff *skb;
+    member_read(&skb, args, skbaddr);
+    event.pid = pid;
+    event.ts = bpf_ktime_get_ns();
+
+    if (1 == do_trace_skb(&event, args, skb)) {
+
+        //shoot to userspace
+        events.perf_submit(args, &event, sizeof(event));
+        //bpf_trace_printk("traceTp_netifRcvSkb_2\\n");
+    }
+
+    return 0;
+}
 
 int trace_ipt_out(struct pt_regs *ctx) {
     struct event_t event = {};
@@ -277,6 +470,11 @@ b.attach_kretprobe(event="iptable_nat_do_chain", fn_name="trace_ipt_out")
 # 3. args can be fount under /sys/kernel/debug/tracing/events/
 # 4. if ctx is used as args in attach_tracepoint, bpf_read cannot work, complains permission denied
 b.attach_tracepoint(tp="net:netif_receive_skb", fn_name="traceTp_netifRcvSkb")
+b.attach_tracepoint(tp="net:netif_rx", fn_name="traceTp_netifRx")
+b.attach_tracepoint(tp="net:netif_rx_entry", fn_name="traceTp_netifRxEtry")
+b.attach_tracepoint(tp="net:net_dev_queue", fn_name="traceTp_netDevQ")
+b.attach_tracepoint(tp="net:net_dev_xmit", fn_name="traceTp_netDevX")
+b.attach_tracepoint(tp="net:net_dev_start_xmit", fn_name="traceTp_netDevStrtX")
 
 #b.attach_uprobe(name="/bin/bash", sym="readline", fn_name="trace_recvfrom")
 
