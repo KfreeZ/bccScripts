@@ -14,10 +14,11 @@ bpf_text = '''
 #include <uapi/linux/ip.h>
 #include <uapi/linux/ipv6.h>
 #include <uapi/linux/tcp.h>
+#include <linux/trace_events.h>
 
 // define output data structure in C
 struct event_t {
-    char func[4];
+    char func[16];
     u32 pid;
     u64 ts;
     u64 netns;
@@ -105,6 +106,7 @@ static inline int do_trace_skb(struct event_t *evt, void *ctx, struct sk_buff *s
     }
 
     if (l4proto != IPPROTO_TCP) {
+        bpf_trace_printk("not TCP \\n");
         return 0;
     }
 
@@ -137,7 +139,18 @@ static inline int do_trace_skb(struct event_t *evt, void *ctx, struct sk_buff *s
 
 int trace_ipt(struct pt_regs *ctx, void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     struct event_t event = {};
-    memset(&event.func, 'a', 4);  
+    //strncpy(&event.func[0], "iptdoChIn", 16);
+    event.func[0] = 'i';
+    event.func[1] = 'p';
+    event.func[2] = 't';
+    event.func[3] = 'D';
+    event.func[4] = 'o';
+    event.func[5] = 'C';
+    event.func[6] = 'h';
+    event.func[7] = 'I';
+    event.func[8] = 'n';
+    event.func[9] = 0;
+
 
     u32 pid = bpf_get_current_pid_tgid();
     event.pid = bpf_get_current_pid_tgid();
@@ -157,9 +170,60 @@ int trace_ipt(struct pt_regs *ctx, void *priv, struct sk_buff *skb, const struct
 }
 
 
+
+
+struct netifRcvSkb_args {
+    // from /sys/kernel/debug/tracing/events/net/netif_receive_skb/format
+    u64 __unused__;
+    u64 skbaddr;
+    u32 len;
+    u32 name;
+};
+int traceTp_netifRcvSkb(struct netifRcvSkb_args *args) {
+    struct event_t event = {};
+    event.func[0] = 'n';
+    event.func[1] = 'e';
+    event.func[2] = 't';
+    event.func[3] = 'i';
+    event.func[4] = 'f';
+    event.func[5] = 'R';
+    event.func[6] = 'c';
+    event.func[7] = 'v';
+    event.func[8] = 'S';
+    event.func[9] = 'k';
+    event.func[10] = 'b';
+    event.func[11] = 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sk_buff *skb;
+    member_read(&skb, args, skbaddr);
+    event.pid = pid;
+    event.ts = bpf_ktime_get_ns();
+
+    if (1 == do_trace_skb(&event, args, skb)) {
+
+        //shoot to userspace
+        events.perf_submit(args, &event, sizeof(event));
+        //bpf_trace_printk("traceTp_netifRcvSkb_2\\n");
+    }
+
+    return 0;
+}
+
+
 int trace_ipt_out(struct pt_regs *ctx) {
     struct event_t event = {};
-    memset(&event.func, 'b', 4);  
+    event.func[0] = 'i';
+    event.func[1] = 'p';
+    event.func[2] = 't';
+    event.func[3] = 'D';
+    event.func[4] = 'o';
+    event.func[5] = 'C';
+    event.func[6] = 'h';
+    event.func[7] = 'O';
+    event.func[8] = 'u';
+    event.func[9] = 't';    
+    event.func[10] = 0;
 
     // Load arguments
     u32 pid = bpf_get_current_pid_tgid();
@@ -206,10 +270,18 @@ bpf_text = bpf_text.replace('FILTER_IP_4', '')
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="iptable_nat_do_chain", fn_name="trace_ipt")
 b.attach_kretprobe(event="iptable_nat_do_chain", fn_name="trace_ipt_out")
+
+# some TIPs
+# 1. cannot attach_kprobe to the trace points for some reason, attach_tracepoint is workable
+# 2. attach_tracepoint is using args as the ctx in the kprobe, if args/ctx is missing, perf_submit() cannot work
+# 3. args can be fount under /sys/kernel/debug/tracing/events/
+# 4. if ctx is used as args in attach_tracepoint, bpf_read cannot work, complains permission denied
+b.attach_tracepoint(tp="net:netif_receive_skb", fn_name="traceTp_netifRcvSkb")
+
 #b.attach_uprobe(name="/bin/bash", sym="readline", fn_name="trace_recvfrom")
 
 
-print("%-18s %-7s %-20s %-20s %-10s %-7s %-60s" % ("TIME(s)","FUNC", "COMM", "DEV", "NS", "PID", "FLOW"))
+print("%-18s %-16s %-20s %-20s %-10s %-7s %-60s" % ("TIME(s)","FUNC", "COMM", "DEV", "NS", "PID", "FLOW"))
 
 # 3. Print debug output
 start = 0
@@ -231,12 +303,12 @@ def print_event(cpu, data, size):
         daddr = 'NA'
 
     flow = "%s:%s->%s:%s SEQ:%d ACK:%d " % (saddr, event.sport, daddr, event.dport, event.seq, event.ack)
-    print("%-18.9f %-6s %-20s %-20s %-10s %-7d %-60s" % (time_s, event.func, event.comm, event.ifname, event.netns, event.pid, flow))
+    print("%-18.9f %-16s %-20s %-20s %-10s %-7d %-60s" % (time_s, event.func, event.comm, event.ifname, event.netns, event.pid, flow))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
     # blocking waiting for events
     b.perf_buffer_poll()
-    #line = b.trace_readline()
-    #print(line)
+    # line = b.trace_readline()
+    # print(line)
