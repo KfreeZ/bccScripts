@@ -92,6 +92,9 @@ static inline int do_trace_skb(struct event_t *evt, void *ctx, struct sk_buff *s
         evt->saddr[0] = iphdr.saddr;
         evt->daddr[0] = iphdr.daddr;
         //bpf_trace_printk("saddr 0x%x daddr 0x%x\\n", be32_to_cpu(iphdr.saddr), be32_to_cpu(iphdr.daddr));
+        ADD_FILTER
+        FILTER_IP_4_BH
+        FILTER_IP_4_LO
         FILTER_IP_4
     } else if (evt->ip_version == 6) {
         struct ipv6hdr* ipv6hdr = (struct ipv6hdr*)ip_header_address;
@@ -455,8 +458,18 @@ args = parser.parse_args()
 if args.peerA and args.peerB:
     pa = ipaddress.ip_address(args.peerA)
     pb = ipaddress.ip_address(args.peerB)
+    loopback = int(ipaddress.ip_address("127.0.0.1"))
+    blackhole = int(ipaddress.ip_address("0.0.0.0"))
+    bpf_text = bpf_text.replace('ADD_FILTER', 'bool filter = true;')
+    bpf_text = bpf_text.replace('FILTER_IP_4_BH',
+       'if(be32_to_cpu(iphdr.saddr) == %d || be32_to_cpu(iphdr.daddr) == %d) {filter = false;}' % (blackhole, blackhole) ) 
+    bpf_text = bpf_text.replace('FILTER_IP_4_LO',
+       'if(be32_to_cpu(iphdr.saddr) == %d || be32_to_cpu(iphdr.daddr) == %d) {filter = false;}' % (loopback, loopback)) 
     bpf_text = bpf_text.replace('FILTER_IP_4', 
-       'if (!(%d == be32_to_cpu(iphdr.saddr) && %d == be32_to_cpu(iphdr.daddr)) && !(%d == be32_to_cpu(iphdr.daddr) && %d == be32_to_cpu(iphdr.saddr))) { return 0; }' % (int(pa), int(pb), int(pa), int(pb)))
+       'if(filter == true) {if (!(%d == be32_to_cpu(iphdr.saddr) && %d == be32_to_cpu(iphdr.daddr)) && !(%d == be32_to_cpu(iphdr.daddr) && %d == be32_to_cpu(iphdr.saddr))) { return 0; }}' % (int(pa), int(pb), int(pa), int(pb)))
+bpf_text = bpf_text.replace('ADD_FILTER', '')
+bpf_text = bpf_text.replace('FILTER_IP_4_BH', '')
+bpf_text = bpf_text.replace('FILTER_IP_4_LO', '')
 bpf_text = bpf_text.replace('FILTER_IP_4', '')
 
 # 2. Build and Inject program
@@ -470,11 +483,11 @@ b.attach_kretprobe(event="iptable_nat_do_chain", fn_name="trace_ipt_out")
 # 3. args can be fount under /sys/kernel/debug/tracing/events/
 # 4. if ctx is used as args in attach_tracepoint, bpf_read cannot work, complains permission denied
 b.attach_tracepoint(tp="net:netif_receive_skb", fn_name="traceTp_netifRcvSkb")
-b.attach_tracepoint(tp="net:netif_rx", fn_name="traceTp_netifRx")
-b.attach_tracepoint(tp="net:netif_rx_entry", fn_name="traceTp_netifRxEtry")
-b.attach_tracepoint(tp="net:net_dev_queue", fn_name="traceTp_netDevQ")
+# b.attach_tracepoint(tp="net:netif_rx", fn_name="traceTp_netifRx")
+# b.attach_tracepoint(tp="net:netif_rx_entry", fn_name="traceTp_netifRxEtry")
+# b.attach_tracepoint(tp="net:net_dev_queue", fn_name="traceTp_netDevQ")
 b.attach_tracepoint(tp="net:net_dev_xmit", fn_name="traceTp_netDevX")
-b.attach_tracepoint(tp="net:net_dev_start_xmit", fn_name="traceTp_netDevStrtX")
+# b.attach_tracepoint(tp="net:net_dev_start_xmit", fn_name="traceTp_netDevStrtX")
 
 #b.attach_uprobe(name="/bin/bash", sym="readline", fn_name="trace_recvfrom")
 
